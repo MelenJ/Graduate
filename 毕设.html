@@ -1,0 +1,457 @@
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>建筑浏览系统</title>
+
+  <script src="https://js.arcgis.com/calcite-components/1.2.0/calcite.esm.js" type="module"></script>
+  <link rel="stylesheet" href="https://js.arcgis.com/calcite-components/1.2.0/calcite.css" />
+
+  <script src="https://js.arcgis.com/4.26/"></script>
+  <link rel="stylesheet" href="https://js.arcgis.com/4.26/esri/themes/light/main.css" />
+</head>
+<style>
+  html,
+  body,
+  #viewDiv {
+    padding: 0;
+    margin: 0;
+    height: 100%;
+    width: 100%;
+  }
+
+  body {
+    display: flex;
+  }
+
+  calcite-loader {
+    align-self: center;
+    justify-self: center;
+  }
+
+  #header-title {
+    margin-left: 1rem;
+    margin-right: 1rem;
+  }
+
+  #info-content {
+    padding: 0.75rem;
+  }
+  #createSlideDiv {
+        background-color: white;
+        opacity: 0.9;
+        color: black;
+        padding: 6px;
+      }
+
+      #slidesDiv {
+        background-color: white;
+        opacity: 0.9;
+        color: black;
+        padding: 10px;
+        visibility: hidden;
+        bottom: 20px;
+        overflow-y: auto;
+        text-align: center;
+        height: 260px;
+      }
+
+      #slidesDiv .slide {
+        /*在幻灯片上将光标显示为指针*/
+        cursor: pointer;
+        margin-bottom: 6px;
+      }
+
+      #slidesDiv .slide .title {
+        /*标题文本内容居中*/
+        text-align: center;
+      }
+      /* 在缩略图周围绘制带有漂亮边框的活动幻灯片 */
+
+      #slidesDiv .slide.active img {
+        box-shadow: 0px 0px 12px black;
+        border-style: solid;
+        border-width: thin;
+        border-color: black;
+      }
+
+      #configPanel {
+        padding: 1em;
+        padding-top: 0em;
+        padding-bottom: 0em;
+      }
+      calcite-label {
+        background-color: #ffffff;
+      }
+      #toggleLabel {
+        padding-top: 0.3em;
+      }
+
+
+  calcite-rating {
+    margin-top: 0.25rem;
+  }
+</style>
+
+<body>
+  <calcite-loader></calcite-loader>
+  <calcite-shell content-behind hidden>
+    <h2 id="header-title" slot="header">
+      <!-- 自动添加数据 -->
+    </h2>
+
+    <calcite-shell-panel slot="panel-start" detached>
+      <calcite-action-bar slot="action-bar">
+        <calcite-action data-action-id="layers" icon="layers" text="图层"></calcite-action>
+        <calcite-action data-action-id="basemaps" icon="basemap" text="底图库"></calcite-action>
+        <calcite-action data-action-id="legend" icon="legend" text="图例"></calcite-action>
+        <calcite-action data-action-id="locate" icon="gps-on-f" text="定位"></calcite-action>
+        <calcite-action data-action-id="measure" icon="measure" text="测量"></calcite-action>
+        <calcite-action data-action-id="buildings" icon="organization" text="建筑浏览器"></calcite-action>
+        <calcite-action data-action-id="information" icon="information" text="信息"></calcite-action>
+      </calcite-action-bar>
+
+      <!-- 特定于地图的面板(每个面板为 ArcGIS Maps SDK for JavaScript 小部件提供一个 div -->
+      <calcite-panel heading="图层" height-scale="l" data-panel-id="layers" hidden>
+        <div id="layers-container"></div>
+      </calcite-panel>
+      <calcite-panel heading="底图库" height-scale="l" data-panel-id="basemaps" hidden>
+        <div id="basemaps-container"></div>
+      </calcite-panel>
+      <calcite-panel heading="图例" height-scale="l" data-panel-id="legend" hidden>
+        <div id="legend-container"></div>
+      </calcite-panel>
+      <calcite-panel heading="定位" height-scale="l" data-panel-id="locate" hidden>
+        <div id="locate-container"></div>
+      </calcite-panel>
+      <calcite-panel heading="测量" height-scale="l" data-panel-id="measure" hidden>
+        <div id="measure-container"></div>
+      </calcite-panel>
+    </calcite-panel>
+    <calcite-panel heading="建筑浏览器" height-scale="l" data-panel-id="buildings" hidden>
+      <div id="buildings-container"></div>
+    </calcite-panel>
+
+      <!-- 信息面板(填充来自网络地图的信息) -->
+      <calcite-panel heading="细节" data-panel-id="information" hidden>
+        <div id="info-content">
+          <img id="item-thumbnail" alt="webmap thumbnail" />
+          <div id="item-description">
+            <!-- 自动填充数据 -->
+          </div>
+          <calcite-label layout="inline">
+            <b>评分:</b>
+            <calcite-rating id="item-rating" read-only>
+              <!-- 自动填充数据 -->
+            </calcite-rating>
+          </calcite-label>
+        </div>
+      </calcite-panel>
+    </calcite-shell-panel>
+    <calcite-panel id="configPanel" heading="放大">
+        <calcite-label id="toggleLabel"
+          >开启
+          <calcite-switch scale="l" id="toggleSwitch"></calcite-switch>
+        </calcite-label>
+        <calcite-label
+          >倍数
+          <calcite-input id="factorInput" type="number" scale="s" min="0">
+          </calcite-input>
+        </calcite-label>
+        <calcite-label
+          >xoffset
+          <calcite-input id="xoffsetInput" type="number" scale="s">
+          </calcite-input>
+        </calcite-label>
+        <calcite-label
+          >yoffset
+          <calcite-input id="yoffsetInput" type="number" scale="s">
+          </calcite-input>
+        </calcite-label>
+        <calcite-label
+          >size
+          <calcite-input id="sizeInput" type="number" scale="s" min="0">
+          </calcite-input>
+        </calcite-label>
+      </calcite-panel>
+    <div id="viewDiv"></div>
+    <div id="createSlideDiv" class="esri-widget">
+      新视角: <input type="text" id="createSlideTitleInput" size="10" />
+      <button id="createSlideButton">保存</button>
+    </div>
+    <div id="slidesDiv" class="esri-widget"></div>
+  </calcite-shell>
+</body>
+<script>
+  require([
+    "esri/WebScene",
+    "esri/views/SceneView",
+    "esri/widgets/BasemapGallery",
+    "esri/widgets/LayerList",
+    "esri/widgets/Legend",
+    "esri/widgets/Locate",
+    "esri/widgets/AreaMeasurement3D",
+    "esri/widgets/Expand",
+    "esri/webscene/Slide",
+    "esri/widgets/Directions",
+    "esri/widgets/BuildingExplorer",
+    "esri/layers/RouteLayer",
+    "esri/config",
+    "esri/layers/SceneLayer"
+  ], function(WebScene, SceneView, BasemapGallery, LayerList, Legend, Locate, AreaMeasurement3D, Expand, Slide, Directions, BuildingExplorer , RouteLayer, Config, SceneLayer) {
+    //加载自己创建的web场景
+    const webscene = new WebScene({
+          portalItem: {
+            id: "00f62f1063d448d0878605c702b805f0"
+          }
+        });
+
+    const view = new SceneView({
+          container: "viewDiv",
+          map: webscene
+        });
+     //添加apikey
+    const apiKey = "AAPK6b05f65624084b4d91bfcf36a2c63ce0MpVnxUUg8UFRNa9TIzHxeWGLprPqoMBeAF-IVKJ0cUPJc2O2tjdGzX2088etkh_m";
+
+    const layer = new SceneLayer({
+          portalItem: {
+            id: "ca0470dbbddb4db28bad74ed39949e25"
+          },
+          title: "OpenStreetMap3D_Buildings_v1"
+        });
+
+    
+    //方解石设计系统订制基本微键
+    view.ui.move("zoom", "top-left");
+    const basemaps = new BasemapGallery({
+      view,
+      container: "basemaps-container"
+    });
+    const layerList = new LayerList({
+      view,
+      selectionEnabled: true,
+      container: "layers-container"
+    });
+    const legend = new Legend({
+      view,
+      container: "legend-container"
+    });
+    const locate = new Locate({
+      view,
+      container:"locate-container"
+    });
+    const measurementWidget = new AreaMeasurement3D({
+      view,
+      container:"measure-container"
+    });
+
+
+    view.when(() => {
+            // 从web场景中获取建筑场景图层
+            webscene.allLayers.forEach((layer) => {
+              if (layer.title === "建筑实例 - 建筑实例") {
+
+                // 使用 BuildingExplorer小部件探索建筑图层中的组件
+                const buildingExplorer = new BuildingExplorer({
+                  view,
+                  layers: [layer],
+                  container:"buildings-container"
+                });
+              }
+            });
+          });
+  
+    //创建放大镜微键
+    const configurationExpand = new Expand({
+          expandIconClass: "esri-icon-settings2",
+          expandTooltip: "Show magnifier configuration",
+          expanded: true,
+          view: view,
+          content: document.getElementById("configPanel")
+        });
+        // 将 UI 组件添加到视图中
+        view.ui.add(configurationExpand, "bottom-left");
+
+        view.when(() => {
+          // 启动放大镜
+          view.magnifier.visible = false;
+          view.magnifier.factor = 1.7; // 放大系数
+          view.magnifier.size = 150; //放大镜图像尺寸
+          view.magnifier.offset = { x: 75, y: 75 }; //X 和 y 偏移值
+
+          // 使用鼠标光标位置来定位放大镜
+          view.on("pointer-move", (evt) => {
+            view.magnifier.position = { x: evt.x, y: evt.y };
+          });
+
+          // 设置 UI 以使用默认配置值
+          setMangifierConfig(view.magnifier);
+        });
+
+        function setMangifierConfig(magnifier) {
+          const toggleSwitch = document.getElementById("toggleSwitch");
+          const factorInput = document.getElementById("factorInput");
+          const xoffsetInput = document.getElementById("xoffsetInput");
+          const yoffsetInput = document.getElementById("yoffsetInput");
+          const sizeInput = document.getElementById("sizeInput");
+
+          // 设置默认输入值
+          toggleSwitch.checked = magnifier.visible;
+          factorInput.value = magnifier.factor;
+          xoffsetInput.value = magnifier.offset.x;
+          yoffsetInput.value = magnifier.offset.y;
+          sizeInput.value = magnifier.size;
+
+          // 添加方解石事件监听器
+          toggleSwitch.addEventListener("calciteSwitchChange", (evt) => {
+            magnifier.visible = evt.target.checked;
+          });
+          factorInput.addEventListener("calciteInputInput", (evt) => {
+            magnifier.factor = parseFloat(evt.target.value);
+          });
+          xoffsetInput.addEventListener("calciteInputInput", (evt) => {
+            magnifier.offset.x = parseInt(evt.target.value);
+          });
+          yoffsetInput.addEventListener("calciteInputInput", (evt) => {
+            magnifier.offset.y = parseInt(evt.target.value);
+          });
+          sizeInput.addEventListener("calciteInputInput", (evt) => {
+            magnifier.size = parseInt(evt.target.value);
+          });
+        }
+
+  view.ui.add(["createSlideDiv", "slidesDiv"], "top-right");
+
+   //函数通过创建 DOM 节点并将它们添加到 slidesDiv 容器来创建幻灯片的 UI。
+         function createSlideUI(slide, placement) {
+  //创建一个包含所有幻灯片信息的新 < div > 元素。存储对创建的 DOM 节点的引用，以便我们可以使用它来放置其他 DOM 节点并连接事件。
+        const slideElement = document.createElement("div");
+  // 将幻灯片的 ID 分配给 < span > 元素
+            slideElement.id = slide.id;
+            slideElement.classList.add("slide");
+
+  //将新创建的 DOM 节点 cat 放在 slidesDiv 的开头
+        const slidesDiv = document.getElementById("slidesDiv");
+          if (placement === "first") {
+            slidesDiv.insertBefore(slideElement, slidesDiv.firstChild);
+        } else {
+            slidesDiv.appendChild(slideElement);
+      }
+
+  //创建一个 < div > 元素来包含幻灯片标题文本
+        const title = document.createElement("div");
+           title.innerText = slide.title.text;
+  //将幻灯片的标题放在 < div > 元素中
+           slideElement.appendChild(title);
+
+  //创建一个新的 < img > 元素，并将其放在新创建的 Slideelement 中。这将引用幻灯片中的缩略图。
+        const img = new Image();
+  // 将图像的 src URL 设置为幻灯片的缩略图 URL
+          img.src = slide.thumbnail.url;
+  // 将图像的 title 属性设置为幻灯片的标题
+          img.title = slide.title.text;
+  // 将图像放在新的 < div > 元素中
+          slideElement.appendChild(img);
+
+  //在新创建的幻灯片上设置一个单击事件处理程序。当单击时，将执行下面定义的代码。
+          slideElement.addEventListener("click", () => {
+    //使用.slide 类从所有元素中删除“活动”类
+           const slides = document.querySelectorAll(".slide");
+            Array.from(slides).forEach((node) => {
+            node.classList.remove("active");
+           });
+
+    //在选定的当前元素上添加“活动”类
+            slideElement.classList.add("active");
+
+    //将幻灯片设置应用于 SceneView。每张幻灯片都有一个视角和 visbleLayers 属性，用于定义幻灯片的视角或摄像机，以及在选择幻灯片时应该对用户可见的图层。
+    //此方法允许用户对给定幻灯片的视点进行动画处理，并在视图中打开其可见层和基础地图层。
+           slide.applyTo(view);
+       });
+     }
+       view.when(() => {
+  //幻灯片将放置在‘ slidesDiv’< div > 元素中
+        document.getElementById("slidesDiv").style.visibility = "visible";
+
+  //幻灯片是 WebScene 表示属性中的一个集合。
+        const slides = webscene.presentation.slides;
+  //循环遍历集合中的每个幻灯片并呈现幻灯片
+        slides.forEach(createSlideUI);
+  //在单击 Create 幻灯片按钮之后，使用 Slide.createFrom 创建一个新幻灯片，使用来自标题输入的文本作为幻灯片的标题。
+        document.getElementById("createSlideButton").addEventListener("click", () => {
+    //使用 Slide.createFrom 静态方法创建一个新幻灯片，其中包含当前视图的快照(可见层、底图、摄像头)。
+    // 一旦成功创建幻灯片，此方法将返回一个结果为一个新 Slide 实例的束。
+       Slide.createFrom(view).then((slide) => {
+      //设置幻灯片标题
+      slide.title.text = document.getElementById("createSlideTitleInput").value;
+
+      //将幻灯片添加到场景演示的幻灯片集合中，这样，如果场景要发布回门户，新创建的幻灯片将正确地作为Web场景的一部分保存。
+      webscene.presentation.slides.add(slide);
+
+      //为幻灯片创建 UI 并将其呈现给用户
+      createSlideUI(slide, "first");
+    });
+  });
+});
+
+      const routeLayer = new RouteLayer();
+
+     // 添加到方向小部件
+      let directionsWidget = new Directions({
+        layer: routeLayer,
+        apiKey,
+        view
+      });
+
+    // 将 Directions 小部件添加到视图的右上角
+     view.ui.add(directionsWidget, {
+     position: "top-trailing"
+       });
+
+    
+    webscene.when(() => {
+      const {
+        title,
+        description,
+        thumbnailUrl,
+        avgRating
+      } = webscene.portalItem;
+      document.querySelector("#header-title").textContent = title;
+      document.querySelector("#item-description").innerHTML = description;
+      document.querySelector("#item-thumbnail").src = thumbnailUrl;
+      document.querySelector("#item-rating").value = avgRating;
+      let activeWidget;
+      const handleActionBarClick = ({
+        target
+      }) => {
+        if (target.tagName !== "CALCITE-ACTION") {
+          return;
+        }
+        if (activeWidget) {
+          document.querySelector(`[data-action-id=${activeWidget}]`).active = false;
+          document.querySelector(`[data-panel-id=${activeWidget}]`).hidden = true;
+        }
+        const nextWidget = target.dataset.actionId;
+        if (nextWidget !== activeWidget) {
+          document.querySelector(`[data-action-id=${nextWidget}]`).active = true;
+          document.querySelector(`[data-panel-id=${nextWidget}]`).hidden = false;
+          activeWidget = nextWidget;
+        } else {
+          activeWidget = null;
+        }
+      };
+      document.querySelector("calcite-action-bar").addEventListener("click", handleActionBarClick);
+      let actionBarExpanded = false;
+      document.addEventListener("calciteActionBarToggle", event => {
+        actionBarExpanded = !actionBarExpanded;
+        view.padding = {
+          left: actionBarExpanded ? 150 : 45
+        };
+      });
+      document.querySelector("calcite-shell").hidden = false;
+      document.querySelector("calcite-loader").hidden = true;
+    });
+  });
+</script>
+</html>
